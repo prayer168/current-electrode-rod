@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚡ 電流急急棒</title>
+<style>
+  :root{
+    --bg:#070b16; --bg2:#0d1530; --neon:#19e0ff; --neon2:#7b5cff;
+    --green:#39ff9e; --red:#ff3b5c; --gold:#ffd23f; --ink:#cfe6ff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    background:radial-gradient(120% 120% at 50% -10%, #15214a 0%, var(--bg) 60%);
+    color:var(--ink); font-family:"Segoe UI","Microsoft JhengHei",system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center; min-height:100%;
+    overflow-x:hidden; user-select:none;
+  }
+  h1{font-size:clamp(20px,5vw,32px); margin:14px 0 2px; letter-spacing:2px;
+     text-shadow:0 0 12px var(--neon),0 0 26px var(--neon2);}
+  .sub{font-size:12px; opacity:.6; margin-bottom:8px;}
+
+  #hud{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+       margin-bottom:8px; width:96%; max-width:1000px;}
+  .stat{background:rgba(20,30,60,.6); border:1px solid rgba(80,140,255,.3);
+        border-radius:10px; padding:6px 12px; font-size:14px; min-width:84px; text-align:center;}
+  .stat b{display:block; font-size:18px; color:#fff; text-shadow:0 0 8px var(--neon);}
+  .stat span{font-size:11px; opacity:.65;}
+
+  #stage{position:relative; width:96%; max-width:1000px; aspect-ratio:1000/620;
+         border-radius:14px; overflow:hidden;
+         box-shadow:0 0 0 1px rgba(90,150,255,.25), 0 10px 40px rgba(0,0,0,.6),
+                    inset 0 0 60px rgba(20,40,90,.5);}
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none;}
+
+  #overlay{position:absolute; inset:0; display:flex; flex-direction:column;
+           align-items:center; justify-content:center; text-align:center;
+           background:rgba(5,10,22,.82); backdrop-filter:blur(4px); padding:16px; gap:8px;}
+  #overlay.hidden{display:none;}
+  #overlay h2{margin:0; font-size:clamp(22px,6vw,40px);
+              text-shadow:0 0 18px currentColor;}
+  #overlay p{margin:2px; font-size:14px; opacity:.85;}
+  .btn{margin-top:8px; cursor:pointer; border:none; border-radius:12px;
+       padding:12px 26px; font-size:16px; font-weight:700; color:#031019;
+       background:linear-gradient(180deg,var(--neon),#0bb9e0);
+       box-shadow:0 0 20px rgba(25,224,255,.6); letter-spacing:1px;}
+  .btn:active{transform:scale(.96);}
+  .btn.ghost{background:transparent; color:var(--ink);
+             border:1px solid rgba(120,160,255,.4); box-shadow:none;}
+
+  #levels{display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+          margin:12px 0 30px; width:96%; max-width:1000px;}
+  .lv{width:46px; height:46px; border-radius:10px; cursor:pointer; font-weight:700;
+      background:rgba(20,30,60,.6); border:1px solid rgba(90,150,255,.3); color:var(--ink);
+      display:flex; align-items:center; justify-content:center; font-size:16px; position:relative;}
+  .lv.cur{border-color:var(--neon); box-shadow:0 0 14px var(--neon); color:#fff;}
+  .lv.done{color:var(--green); border-color:rgba(57,255,158,.5);}
+  .lv.locked{opacity:.35; cursor:not-allowed;}
+  .lv small{position:absolute; bottom:-16px; font-size:9px; opacity:.6; white-space:nowrap;}
+  .hint{font-size:12px; opacity:.55; margin:4px 0 0; text-align:center;}
+</style>
+</head>
+<body>
+  <h1>⚡ 電流急急棒</h1>
+  <div class="sub">沿著光軌從起點 ● 移到終點 ⚑，碰到邊就觸電！</div>
+
+  <div id="hud">
+    <div class="stat"><b id="hLevel">1</b><span>關卡</span></div>
+    <div class="stat"><b id="hTime">0.0″</b><span>計時</span></div>
+    <div class="stat"><b id="hBest">—</b><span>最佳</span></div>
+    <div class="stat"><b id="hZap">0</b><span>觸電</span></div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="overlay">
+      <h2 id="ovTitle">準備好了嗎？</h2>
+      <p id="ovMsg"></p>
+      <button class="btn" id="ovBtn">開始</button>
+    </div>
+  </div>
+
+  <p class="hint" id="ctrlHint"></p>
+  <div id="levels"></div>
+
+<script>
+(()=>{
+const W=1000, H=620;
+const cv=document.getElementById('game');
+const ctx=cv.getContext('2d');
+const dpr=Math.min(window.devicePixelRatio||1, 2);
+cv.width=W*dpr; cv.height=H*dpr; ctx.scale(dpr,dpr);
+
+// offscreen layers
+const trackCv=document.createElement('canvas'); trackCv.width=W*dpr; trackCv.height=H*dpr;
+const tctx=trackCv.getContext('2d'); tctx.scale(dpr,dpr);
+const maskCv=document.createElement('canvas'); maskCv.width=W; maskCv.height=H; // logical res
+const mctx=maskCv.getContext('2d',{willReadFrequently:true});
+
+const TOTAL_LEVELS=12;
+const START_R=26, END_R=26, CP_R=15;
+
+// ---------- level path generation ----------
+function genLevel(n){ // n: 1..12
+  const lv=n-1;
+  const margin=80;
+  const segs=7+lv;                               // more wiggles each level
+  const freq=2.0 + lv*0.55;                       // oscillation frequency
+  const amp=Math.min(H/2-55, 70 + lv*14);
+  const harmonic= lv>=4 ? (0.25+lv*0.04) : 0;     // add 2nd harmonic from lv4
+  const width=Math.max(17, 46 - lv*2.6);          // corridor narrows
+  const pts=[];
+  for(let i=0;i<=segs;i++){
+    const t=i/segs;
+    const x=margin + (W-2*margin)*t;
+    let y=H/2 + amp*Math.sin(t*Math.PI*freq + lv*0.7);
+    if(harmonic) y += amp*harmonic*Math.sin(t*Math.PI*freq*2 + lv);
+    y=Math.max(margin*0.7, Math.min(H-margin*0.7, y));
+    pts.push({x,y});
+  }
+  // checkpoints: spread along interior waypoints
+  const cps=[];
+  const nCp=Math.min(4, 1+Math.floor(lv/2));
+  for(let k=1;k<=nCp;k++){
+    const idx=Math.round(segs*k/(nCp+1));
+    cps.push({x:pts[idx].x, y:pts[idx].y});
+  }
+  return {pts, cps, width};
+}
+
+// smoothed path stroking (quadratic through midpoints)
+function tracePath(c, pts){
+  c.beginPath();
+  c.moveTo(pts[0].x, pts[0].y);
+  for(let i=1;i<pts.length-1;i++){
+    const mx=(pts[i].x+pts[i+1].x)/2, my=(pts[i].y+pts[i+1].y)/2;
+    c.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  const last=pts[pts.length-1];
+  c.lineTo(last.x, last.y);
+}
+
+// ---------- render static layer + mask ----------
+function buildLevel(L){
+  // ---- mask (safe = opaque) ----
+  mctx.clearRect(0,0,W,H);
+  mctx.lineCap='round'; mctx.lineJoin='round';
+  mctx.strokeStyle='#fff'; mctx.lineWidth=L.width;
+  tracePath(mctx, L.pts); mctx.stroke();
+  mctx.fillStyle='#fff';
+  const s=L.pts[0], e=L.pts[L.pts.length-1];
+  mctx.beginPath(); mctx.arc(s.x,s.y,START_R,0,7); mctx.fill();
+  mctx.beginPath(); mctx.arc(e.x,e.y,END_R,0,7); mctx.fill();
+
+  // ---- visual track ----
+  tctx.clearRect(0,0,W,H);
+  // grid background
+  tctx.save();
+  tctx.strokeStyle='rgba(70,110,200,.08)'; tctx.lineWidth=1;
+  for(let x=0;x<=W;x+=40){tctx.beginPath();tctx.moveTo(x,0);tctx.lineTo(x,H);tctx.stroke();}
+  for(let y=0;y<=H;y+=40){tctx.beginPath();tctx.moveTo(0,y);tctx.lineTo(W,y);tctx.stroke();}
+  tctx.restore();
+
+  tctx.lineCap='round'; tctx.lineJoin='round';
+  // outer danger edge (red rim glow)
+  tctx.save();
+  tctx.shadowColor='rgba(255,59,92,.0)';
+  tracePath(tctx,L.pts);
+  tctx.strokeStyle='rgba(255,80,110,.18)'; tctx.lineWidth=L.width+16; tctx.stroke();
+  tctx.restore();
+  // neon glow tube
+  tctx.save();
+  tctx.shadowColor='rgba(25,224,255,.9)'; tctx.shadowBlur=22;
+  tracePath(tctx,L.pts);
+  tctx.strokeStyle='rgba(25,224,255,.85)'; tctx.lineWidth=L.width; tctx.stroke();
+  tctx.restore();
+  // inner dark channel
+  tracePath(tctx,L.pts);
+  tctx.strokeStyle='rgba(8,16,34,.92)'; tctx.lineWidth=Math.max(4,L.width-12); tctx.stroke();
+  // center dashed line
+  tctx.save();
+  tctx.setLineDash([10,12]);
+  tracePath(tctx,L.pts);
+  tctx.strokeStyle='rgba(123,92,255,.5)'; tctx.lineWidth=2; tctx.stroke();
+  tctx.restore();
+
+  // start zone
+  tctx.save();
+  tctx.shadowColor=getC('--green'); tctx.shadowBlur=18;
+  tctx.fillStyle=getC('--green');
+  tctx.beginPath(); tctx.arc(s.x,s.y,START_R,0,7); tctx.fill();
+  tctx.restore();
+  tctx.fillStyle='#042'; tctx.font='bold 20px system-ui'; tctx.textAlign='center'; tctx.textBaseline='middle';
+  tctx.fillText('▶', s.x, s.y);
+  // end zone
+  tctx.save();
+  tctx.shadowColor=getC('--gold'); tctx.shadowBlur=18;
+  tctx.fillStyle=getC('--gold');
+  tctx.beginPath(); tctx.arc(e.x,e.y,END_R,0,7); tctx.fill();
+  tctx.restore();
+  tctx.fillStyle='#330'; tctx.fillText('⚑', e.x, e.y);
+  // checkpoints
+  L.cps.forEach(cp=>{
+    tctx.save();
+    tctx.shadowColor=getC('--neon2'); tctx.shadowBlur=12;
+    tctx.strokeStyle=getC('--neon2'); tctx.lineWidth=3;
+    tctx.beginPath(); tctx.arc(cp.x,cp.y,CP_R,0,7); tctx.stroke();
+    tctx.restore();
+  });
+}
+function getC(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+// ---------- audio ----------
+let AC=null;
+function audio(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function buzz(){
+  const a=audio(); if(!a)return; const t=a.currentTime;
+  // sawtooth gritty + noise
+  const o=a.createOscillator(), g=a.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(90,t); o.frequency.linearRampToValueAtTime(55,t+.25);
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.5,t+.01); g.gain.exponentialRampToValueAtTime(.0001,t+.3);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+.32);
+  const buf=a.createBuffer(1,a.sampleRate*0.2,a.sampleRate); const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+  const ns=a.createBufferSource(); ns.buffer=buf; const ng=a.createGain(); ng.gain.value=.25;
+  ns.connect(ng); ng.connect(a.destination); ns.start(t);
+}
+function tone(freq,dur,when,type='sine',vol=.3){
+  const a=audio(); if(!a)return; const t=a.currentTime+when;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+dur+.02);
+}
+function win(){ [523,659,784,1047].forEach((f,i)=>tone(f,.22,i*.1,'triangle',.35)); }
+function blip(){ tone(880,.12,0,'square',.25); }
+
+// ---------- state ----------
+let level=1, L=null;
+let state='armed';   // armed | playing | dead | won
+let cur={x:0,y:0};   // control point (logical)
+let prev=null;
+let armPoint=null;   // where to press to (re)start
+let lastCp=null;     // respawn point
+let cpsReached=[];
+let elapsed=0, lastT=0, running=false;
+let zaps=0;
+let flash=0, sparks=[], pointerType='mouse';
+
+function loadProgress(){ return parseInt(localStorage.getItem('jjb_unlock')||'1',10); }
+function saveProgress(n){ localStorage.setItem('jjb_unlock', String(Math.max(loadProgress(),n))); }
+function bestKey(n){return 'jjb_best_'+n;}
+function getBest(n){ const v=localStorage.getItem(bestKey(n)); return v?parseFloat(v):null; }
+function setBest(n,t){ const b=getBest(n); if(b===null||t<b) localStorage.setItem(bestKey(n),t.toFixed(2)); }
+
+// ---------- level setup ----------
+function startLevel(n){
+  level=n; L=genLevel(n); buildLevel(L);
+  state='armed';
+  armPoint={...L.pts[0]};
+  lastCp={...L.pts[0]};
+  cur={...L.pts[0]}; prev=null;
+  cpsReached=L.cps.map(()=>false);
+  elapsed=0; running=false; zaps=0; flash=0; sparks=[];
+  document.getElementById('hLevel').textContent=n;
+  document.getElementById('hZap').textContent=0;
+  const b=getBest(n); document.getElementById('hBest').textContent=b!==null?b.toFixed(2)+'″':'—';
+  showOverlay('第 '+n+' 關', '把'+(pointerType==='touch'?'手指':'游標')+'移到綠色起點 ▶ 並按住，沿光軌前進。', '進入');
+  renderLevels();
+}
+
+// ---------- overlay ----------
+const overlay=document.getElementById('overlay');
+const ovTitle=document.getElementById('ovTitle'), ovMsg=document.getElementById('ovMsg'), ovBtn=document.getElementById('ovBtn');
+function showOverlay(title,msg,btn,color){
+  overlay.classList.remove('hidden');
+  ovTitle.textContent=title; ovTitle.style.color=color||'#fff';
+  ovMsg.innerHTML=msg; ovBtn.textContent=btn;
+}
+function hideOverlay(){ overlay.classList.add('hidden'); }
+ovBtn.addEventListener('click',()=>{ audio(); hideOverlay(); });
+
+// ---------- pointer ----------
+function toLogical(e){
+  const r=cv.getBoundingClientRect();
+  let x=(e.clientX-r.left)/r.width*W;
+  let y=(e.clientY-r.top)/r.height*H;
+  if(e.pointerType==='touch') y-=70;           // offset cursor above finger
+  return {x,y};
+}
+function maskAlpha(x,y){
+  if(x<0||y<0||x>=W||y>=H) return 0;
+  return mctx.getImageData(x|0,y|0,1,1).data[3];
+}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+
+cv.addEventListener('pointerdown',e=>{
+  audio(); pointerType=e.pointerType||'mouse'; e.preventDefault();
+  const p=toLogical(e);
+  if(!overlay.classList.contains('hidden')) return;
+  if(state==='armed'){
+    if(dist(p,armPoint) < Math.max(40,L.width)){
+      cur=p; prev={...p};
+      state='playing'; running=true;
+      if(armPoint.x===L.pts[0].x && armPoint.y===L.pts[0].y) elapsed=0; // fresh start resets timer
+    }
+  }
+});
+cv.addEventListener('pointermove',e=>{
+  if(state!=='playing') return; e.preventDefault();
+  const p=toLogical(e);
+  // sample along the move segment to prevent jumping walls
+  if(prev){
+    const steps=Math.max(1, Math.ceil(dist(prev,p)/(L.width*0.35)));
+    for(let i=1;i<=steps;i++){
+      const sx=prev.x+(p.x-prev.x)*i/steps, sy=prev.y+(p.y-prev.y)*i/steps;
+      if(maskAlpha(sx,sy)===0){ electrocute({x:sx,y:sy}); return; }
+    }
+  }
+  cur=p; prev={...p};
+  // checkpoints
+  L.cps.forEach((cp,i)=>{ if(!cpsReached[i] && dist(cur,cp)<CP_R+4){ cpsReached[i]=true; lastCp={...cp}; blip(); }});
+  // win
+  if(dist(cur,L.pts[L.pts.length-1])<END_R){ doWin(); }
+});
+function endHold(){ if(state==='playing'){ // lifted finger/mouse mid-track -> back to last checkpoint
+  state='armed'; armPoint={...lastCp}; cur={...lastCp}; prev=null; running=false; }
+}
+cv.addEventListener('pointerup',e=>{e.preventDefault(); endHold();});
+cv.addEventListener('pointercancel',()=>endHold());
+cv.addEventListener('pointerleave',()=>{ if(pointerType==='mouse') endHold(); });
+
+function electrocute(at){
+  zaps++; document.getElementById('hZap').textContent=zaps;
+  buzz(); flash=1;
+  for(let i=0;i<18;i++){const a=Math.random()*7,s=2+Math.random()*4;
+    sparks.push({x:at.x,y:at.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1});}
+  state='armed'; armPoint={...lastCp}; cur={...lastCp}; prev=null; running=false;
+}
+function doWin(){
+  state='won'; running=false; win();
+  setBest(level, elapsed);
+  saveProgress(level+1);
+  const b=getBest(level);
+  document.getElementById('hBest').textContent=b.toFixed(2)+'″';
+  const isLast=level>=TOTAL_LEVELS;
+  let msg='用時 <b>'+elapsed.toFixed(2)+'″</b>　最佳 '+b.toFixed(2)+'″<br>觸電 '+zaps+' 次';
+  showOverlay(isLast?'🏆 全破關！':'✅ 過關！', msg, isLast?'回到第 1 關':'下一關', getC('--green'));
+  ovBtn.onclick=()=>{ audio(); hideOverlay(); startLevel(isLast?1:level+1); ovBtn.onclick=null; };
+  renderLevels();
+}
+
+// ---------- main loop ----------
+function loop(ts){
+  const dt=lastT?(ts-lastT)/1000:0; lastT=ts;
+  if(running && state==='playing') elapsed+=dt;
+  document.getElementById('hTime').textContent=elapsed.toFixed(1)+'″';
+
+  ctx.clearRect(0,0,W,H);
+  ctx.drawImage(trackCv,0,0,W,H);
+
+  // armed: pulse the arm point
+  if(state==='armed'){
+    const ps=(Math.sin(ts/200)+1)/2;
+    ctx.save(); ctx.globalAlpha=.5+ps*.5;
+    ctx.strokeStyle=getC('--green'); ctx.lineWidth=3; ctx.shadowColor=getC('--green'); ctx.shadowBlur=16;
+    ctx.beginPath(); ctx.arc(armPoint.x,armPoint.y, 18+ps*10, 0,7); ctx.stroke();
+    ctx.restore();
+  }
+
+  // player cursor
+  if(state==='playing'||state==='armed'){
+    const r=Math.max(6, (L?L.width:30)/2-4);
+    ctx.save();
+    ctx.shadowColor=state==='playing'?getC('--neon'):getC('--green'); ctx.shadowBlur=20;
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(cur.x,cur.y,r*0.55,0,7); ctx.fill();
+    ctx.strokeStyle=ctx.shadowColor; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cur.x,cur.y,r,0,7); ctx.stroke();
+    ctx.restore();
+    if(pointerType==='touch' && state==='playing'){ // show finger link line
+      ctx.save(); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.moveTo(cur.x,cur.y); ctx.lineTo(cur.x,cur.y+70); ctx.stroke(); ctx.restore();
+    }
+  }
+
+  // sparks
+  sparks.forEach(s=>{ s.x+=s.vx; s.y+=s.vy; s.vy+=.15; s.life-=.04; });
+  sparks=sparks.filter(s=>s.life>0);
+  sparks.forEach(s=>{ ctx.save(); ctx.globalAlpha=Math.max(0,s.life);
+    ctx.fillStyle=getC('--gold'); ctx.shadowColor=getC('--gold'); ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.arc(s.x,s.y,2.5,0,7); ctx.fill(); ctx.restore(); });
+
+  // red flash
+  if(flash>0){ ctx.save(); ctx.globalAlpha=flash*0.5; ctx.fillStyle=getC('--red');
+    ctx.fillRect(0,0,W,H); ctx.restore(); flash-=0.04; }
+
+  requestAnimationFrame(loop);
+}
+
+// ---------- level select ----------
+const levelsEl=document.getElementById('levels');
+function renderLevels(){
+  const unlock=loadProgress();
+  levelsEl.innerHTML='';
+  for(let i=1;i<=TOTAL_LEVELS;i++){
+    const d=document.createElement('div'); d.className='lv';
+    d.textContent=i;
+    const b=getBest(i);
+    if(i===level) d.classList.add('cur');
+    if(b!==null) d.classList.add('done');
+    if(i>unlock){ d.classList.add('locked'); }
+    else d.onclick=()=>{ audio(); startLevel(i); };
+    if(b!==null){ const sm=document.createElement('small'); sm.textContent=b.toFixed(1)+'″'; d.appendChild(sm); }
+    levelsEl.appendChild(d);
+  }
+}
+
+// hint text by device
+document.getElementById('ctrlHint').textContent=
+  (matchMedia('(pointer:coarse)').matches)
+    ? '📱 手指按住拖曳，控制點在手指上方一點（不會被遮住）'
+    : '🖱️ 按住滑鼠左鍵沿光軌移動，放開或碰邊會退回最近檢查點';
+
+// init
+startLevel(1);
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
