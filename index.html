@@ -109,6 +109,11 @@
   #lab.lit #bulbGlass{fill:var(--gold); stroke:var(--gold); filter:drop-shadow(0 0 16px var(--gold));}
   #bulbFil{stroke:#6b7aa8; stroke-width:2.5; fill:none;}
   #lab.lit #bulbFil{stroke:#9a4a0a;}
+  #buzzBody{fill:#22304f; stroke:#5a72b8; stroke-width:3; transition:fill .15s;}
+  #lab.lit #buzzBody{fill:var(--red); stroke:var(--red); filter:drop-shadow(0 0 12px var(--red));}
+  #buzzWaves{opacity:0;}
+  #lab.lit #buzzWaves{opacity:1; animation:bw .55s ease-out infinite;}
+  @keyframes bw{0%{opacity:.1;}50%{opacity:.95;}100%{opacity:.1;}}
   .swdot{fill:#5a72b8;}
   #swLever{stroke:var(--ink); stroke-width:5; stroke-linecap:round;}
   #lab.closed #swLever{stroke:var(--neon);}
@@ -164,7 +169,7 @@
 
   <div id="edu">
     <div class="lab-title">🔬 互動電路實驗室</div>
-    <div class="lab-sub">動手操作：按開關、在缺口放入不同材料，觀察燈泡會不會亮（和真實電路一樣）</div>
+    <div class="lab-sub">動手操作：按開關、在缺口放入不同材料，觀察燈泡會不會亮、蜂鳴器會不會響（和真實電路一樣）</div>
     <svg id="lab" viewBox="0 0 560 250" xmlns="http://www.w3.org/2000/svg">
       <!-- moving current (whole loop) -->
       <path class="flow" d="M80 70 H480 V200 H80 Z"/>
@@ -175,7 +180,17 @@
       <path class="wire" d="M480 160 V200"/>
       <path class="wire" d="M480 200 H392"/>
       <path class="wire" d="M328 200 H80"/>
-      <path class="wire" d="M80 200 V70"/>
+      <path class="wire" d="M80 200 V157"/>
+      <path class="wire" d="M80 113 V70"/>
+      <!-- buzzer (left edge) -->
+      <g id="buzzWaves" fill="none" stroke="var(--red)" stroke-width="3" stroke-linecap="round">
+        <path d="M60 122 Q48 135 60 148"/>
+        <path d="M51 114 Q33 135 51 156"/>
+        <path d="M42 107 Q20 135 42 163"/>
+      </g>
+      <circle id="buzzBody" cx="80" cy="135" r="22"/>
+      <text x="80" y="141" text-anchor="middle" style="font-size:18px">🔔</text>
+      <text x="80" y="178" text-anchor="middle" style="font-size:12px">蜂鳴器</text>
       <!-- bulb -->
       <line class="wire" x1="250" y1="70" x2="259" y2="70"/>
       <line class="wire" x1="301" y1="70" x2="310" y2="70"/>
@@ -738,7 +753,7 @@ togEdu.addEventListener('click',()=>{
   togEdu.classList.toggle('on',eduMode);
   eduPanel.classList.toggle('show',eduMode);
   localStorage.setItem('jjb_edu', eduMode?'1':'0');
-  if(eduMode) initLab();
+  if(eduMode) initLab(); else stopLabBuzz();
 });
 
 // ---- interactive circuit lab ----
@@ -757,12 +772,27 @@ function buildMatChips(){
 }
 function markChips(box,active){ [...box.children].forEach(c=>c.classList.toggle('on',c===active)); }
 function toggleSwitch(){ swOn=!swOn; renderLab(); }
+// sustained buzzer tone while the lab circuit is closed
+let labBuzzOsc=null, labBuzzGain=null;
+function startLabBuzz(){
+  const a=audio(); if(!a||labBuzzOsc)return;
+  labBuzzOsc=a.createOscillator(); labBuzzGain=a.createGain();
+  labBuzzOsc.type='square'; labBuzzOsc.frequency.value=640;
+  labBuzzGain.gain.value=0.0001; labBuzzOsc.connect(labBuzzGain); labBuzzGain.connect(a.destination);
+  labBuzzOsc.start(); labBuzzGain.gain.setTargetAtTime(0.10, a.currentTime, 0.02);
+}
+function stopLabBuzz(){
+  if(!labBuzzOsc)return; const a=audio(), o=labBuzzOsc, g=labBuzzGain;
+  if(a&&g) g.gain.setTargetAtTime(0,a.currentTime,0.03);
+  labBuzzOsc=null; labBuzzGain=null; setTimeout(()=>{try{o.stop();}catch(e){}},150);
+}
 function renderLab(){
   if(!eduMode) return;
   const lab=document.getElementById('lab'); if(!lab) return;
   const conducting = swOn && curMat && curMat.c;
   const closed = conducting || labForce;
   lab.classList.toggle('closed',closed); lab.classList.toggle('lit',closed);
+  if(conducting) startLabBuzz(); else stopLabBuzz();   // buzzer sounds only when truly closed
   const lev=document.getElementById('swLever');
   if(swOn){ lev.setAttribute('x2','480'); lev.setAttribute('y2','110'); }
   else    { lev.setAttribute('x2','452'); lev.setAttribute('y2','116'); }
@@ -776,10 +806,10 @@ function renderLab(){
   if(labForce){ badge.className='on'; badge.textContent='通路（電流流通！）';
     why.textContent='遊戲中「圈」碰到了軌道，電路被接通 → 電流流過，這就是觸電的原因！'; return; }
   let st,txt;
-  if(!swOn){ st=false; txt='開關是斷開的 → 電路有缺口，電流無法流動。先把開關按成「接通」。'; }
-  else if(!curMat){ st=false; txt='缺口沒有放任何東西 → 斷路，燈泡不亮。試著放入一個材料。'; }
-  else if(curMat.c){ st=true; txt='「'+curMat.n+'」是導體，把缺口接通了 → 通路！電流流動、燈泡亮起。'; }
-  else { st=false; txt='「'+curMat.n+'」是絕緣體，電流無法通過 → 斷路，燈泡不亮。'; }
+  if(!swOn){ st=false; txt='開關是斷開的 → 電路有缺口，電流無法流動，燈泡不亮、蜂鳴器不響。先把開關按成「接通」。'; }
+  else if(!curMat){ st=false; txt='缺口沒有放任何東西 → 斷路，燈泡不亮、蜂鳴器不響。試著放入一個材料。'; }
+  else if(curMat.c){ st=true; txt='「'+curMat.n+'」是導體，把缺口接通了 → 通路！電流流動、燈泡亮起、蜂鳴器「嗶——」響起。'; }
+  else { st=false; txt='「'+curMat.n+'」是絕緣體，電流無法通過 → 斷路，燈泡不亮、蜂鳴器不響。'; }
   badge.className=st?'on':'off';
   badge.textContent=st?'通路（電流流通！）':'斷路（電流不通）';
   why.textContent=txt;
