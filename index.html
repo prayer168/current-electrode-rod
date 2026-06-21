@@ -92,32 +92,41 @@
   #ovQuiz .opt.wrong{background:rgba(255,59,92,.25); border-color:var(--red);}
   #ovQuiz .exp{font-size:13px; opacity:.85; line-height:1.5; min-height:1px;}
 
-  /* education panel */
+  /* interactive circuit lab */
   #edu{display:none; width:96%; max-width:1000px; margin-top:12px;
-       background:rgba(13,21,48,.6); border:1px solid rgba(90,150,255,.25); border-radius:14px; padding:14px;}
+       background:rgba(13,21,48,.6); border:1px solid rgba(90,150,255,.25); border-radius:14px; padding:16px;}
   #edu.show{display:block;}
-  #edu .top{display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:center;}
-  #circuitWrap{flex:1; min-width:280px; max-width:480px;}
-  #circuit{width:100%; height:auto;}
-  #circuit .wire{stroke:#43589a; stroke-width:5; fill:none; stroke-linecap:round;}
-  #circuit .flow{stroke:var(--neon); stroke-width:5; fill:none; stroke-dasharray:9 13; opacity:0;}
-  #circuit.closed .flow{opacity:1; animation:flow .5s linear infinite;}
-  @keyframes flow{to{stroke-dashoffset:-22;}}
-  #circuit .bridge{stroke:var(--neon); stroke-width:5; opacity:0;}
-  #circuit.closed .bridge{opacity:1;}
-  #circuit .buzz{fill:#22304f; stroke:#43589a; stroke-width:3;}
-  #circuit.closed .buzz{fill:var(--red); stroke:var(--red); filter:drop-shadow(0 0 8px var(--red));}
-  #circuit .ring{fill:none; stroke:var(--gold); stroke-width:4;}
-  #circuit text{fill:var(--ink); font-size:13px; font-family:system-ui;}
-  #stat{min-width:150px; text-align:center;}
-  #statBadge{font-size:20px; font-weight:800; padding:8px 14px; border-radius:10px; display:inline-block;}
-  #statBadge.open{color:var(--green); background:rgba(57,255,158,.12); border:1px solid rgba(57,255,158,.4);}
-  #statBadge.closed{color:var(--red); background:rgba(255,59,92,.15); border:1px solid rgba(255,59,92,.5);}
-  #statDesc{font-size:13px; opacity:.8; margin-top:6px; line-height:1.5;}
-  #cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-top:12px;}
-  .card{background:rgba(20,30,60,.5); border:1px solid rgba(90,150,255,.2); border-radius:10px; padding:10px 12px;}
-  .card h4{margin:0 0 4px; font-size:14px; color:var(--neon);}
-  .card p{margin:0; font-size:12.5px; opacity:.82; line-height:1.5;}
+  .lab-title{font-size:16px; font-weight:700; color:var(--neon); text-align:center; margin-bottom:6px;}
+  .lab-sub{font-size:12px; opacity:.6; text-align:center; margin-bottom:10px;}
+  #lab{width:100%; max-width:580px; height:auto; display:block; margin:0 auto;}
+  #lab .wire{stroke:#5a72b8; stroke-width:5; fill:none; stroke-linecap:round;}
+  #lab .flow{stroke:var(--neon); stroke-width:5; fill:none; stroke-dasharray:10 14; opacity:0;}
+  #lab.closed .flow{opacity:1; animation:flow .5s linear infinite;}
+  @keyframes flow{to{stroke-dashoffset:-24;}}
+  #lab text{fill:var(--ink); font-family:system-ui; font-size:13px;}
+  #lab .clickable{cursor:pointer;}
+  #bulbGlass{fill:rgba(255,210,60,.08); stroke:#5a72b8; stroke-width:3; transition:fill .15s;}
+  #lab.lit #bulbGlass{fill:var(--gold); stroke:var(--gold); filter:drop-shadow(0 0 16px var(--gold));}
+  #bulbFil{stroke:#6b7aa8; stroke-width:2.5; fill:none;}
+  #lab.lit #bulbFil{stroke:#9a4a0a;}
+  .swdot{fill:#5a72b8;}
+  #swLever{stroke:var(--ink); stroke-width:5; stroke-linecap:round;}
+  #lab.closed #swLever{stroke:var(--neon);}
+  #labStatus{text-align:center; margin:14px 0 4px;}
+  #labBadge{font-size:20px; font-weight:800; padding:7px 16px; border-radius:10px; display:inline-block;}
+  #labBadge.on{color:#031019; background:var(--neon); box-shadow:0 0 14px rgba(25,224,255,.5);}
+  #labBadge.off{color:var(--ink); background:rgba(120,160,255,.12); border:1px solid rgba(120,160,255,.4);}
+  #labWhy{display:block; font-size:13.5px; opacity:.9; margin-top:8px; line-height:1.6; min-height:1.6em;}
+  .lab-controls{display:flex; flex-wrap:wrap; gap:18px; justify-content:center; margin-top:12px;}
+  .ctrl-group{text-align:center;}
+  .ctrl-label{font-size:12px; opacity:.6; margin-bottom:6px;}
+  .chip{cursor:pointer; border:1px solid rgba(120,160,255,.4); background:rgba(20,30,60,.7); color:var(--ink);
+        border-radius:18px; padding:8px 14px; font-size:13px; margin:3px;}
+  .chip:active{transform:scale(.95);}
+  .chip.on{background:var(--neon); color:#031019; border-color:transparent; box-shadow:0 0 12px rgba(25,224,255,.5);}
+  .chip.cond{border-color:rgba(57,255,158,.55);}
+  .chip.ins{border-color:rgba(255,160,60,.55);}
+  #matChips{max-width:540px;}
 </style>
 </head>
 <body>
@@ -154,40 +163,57 @@
   </div>
 
   <div id="edu">
-    <div class="top">
-      <div id="circuitWrap">
-        <svg id="circuit" viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg">
-          <!-- rectangular circuit loop -->
-          <path class="wire" d="M70 130 H410 V90"/>
-          <path class="wire" d="M410 70 V40 H70 V130"/>
-          <!-- moving current overlay (same loop) -->
-          <path class="flow" d="M70 130 H410 V90 M410 70 V40 H70 V130"/>
-          <!-- gap bridge on right side -->
-          <line class="bridge" x1="410" y1="70" x2="410" y2="90"/>
-          <!-- battery (bottom) -->
-          <line class="wire" x1="225" y1="118" x2="225" y2="142"/>
-          <line class="wire" x1="240" y1="124" x2="240" y2="136"/>
-          <text x="248" y="139">電池</text>
-          <!-- buzzer (top) -->
-          <circle class="buzz" cx="240" cy="40" r="14"/>
-          <text x="232" y="45" style="font-size:15px">🔔</text>
-          <text x="258" y="34">蜂鳴器</text>
-          <!-- contact area: track + ring -->
-          <text x="318" y="22">軌道(導體)</text>
-          <circle class="ring" cx="410" cy="80" r="10"/>
-          <text x="424" y="84">圈</text>
-        </svg>
-      </div>
-      <div id="stat">
-        <span id="statBadge" class="open">斷路（安全）</span>
-        <div id="statDesc">電路有缺口，電流無法流動，蜂鳴器不響。</div>
-      </div>
+    <div class="lab-title">🔬 互動電路實驗室</div>
+    <div class="lab-sub">動手操作：按開關、在缺口放入不同材料，觀察燈泡會不會亮（和真實電路一樣）</div>
+    <svg id="lab" viewBox="0 0 560 250" xmlns="http://www.w3.org/2000/svg">
+      <!-- moving current (whole loop) -->
+      <path class="flow" d="M80 70 H480 V200 H80 Z"/>
+      <!-- wires (broken where components sit) -->
+      <path class="wire" d="M80 70 H250"/>
+      <path class="wire" d="M310 70 H480"/>
+      <path class="wire" d="M480 70 V110"/>
+      <path class="wire" d="M480 160 V200"/>
+      <path class="wire" d="M480 200 H392"/>
+      <path class="wire" d="M328 200 H80"/>
+      <path class="wire" d="M80 200 V70"/>
+      <!-- bulb -->
+      <line class="wire" x1="250" y1="70" x2="259" y2="70"/>
+      <line class="wire" x1="301" y1="70" x2="310" y2="70"/>
+      <circle id="bulbGlass" cx="280" cy="70" r="22"/>
+      <path id="bulbFil" d="M270 78 L276 62 L284 78 L290 62"/>
+      <text x="280" y="34" text-anchor="middle">燈泡</text>
+      <!-- battery -->
+      <line class="wire" x1="160" y1="186" x2="160" y2="214"/>
+      <line class="wire" x1="178" y1="193" x2="178" y2="207" style="stroke-width:7"/>
+      <text x="150" y="234">電池</text>
+      <!-- switch (clickable) -->
+      <circle class="swdot" cx="480" cy="110" r="5"/>
+      <circle class="swdot" cx="480" cy="160" r="5"/>
+      <line id="swLever" x1="480" y1="160" x2="452" y2="116"/>
+      <text x="498" y="140">開關</text>
+      <g id="swGroup" class="clickable"><rect x="445" y="98" width="80" height="74" fill="transparent"/></g>
+      <!-- test gap (material slot) -->
+      <circle class="swdot" cx="328" cy="200" r="5"/>
+      <circle class="swdot" cx="392" cy="200" r="5"/>
+      <g id="matG" style="display:none">
+        <rect id="matRect" x="332" y="189" width="56" height="22" rx="4" fill="rgba(57,255,158,.9)"/>
+        <text id="matText" x="360" y="205" text-anchor="middle" style="fill:#042; font-size:12px; font-weight:700">銅線</text>
+      </g>
+      <text x="360" y="232" text-anchor="middle" style="font-size:12px; opacity:.7">↑ 缺口（放物品測試）</text>
+    </svg>
+    <div id="labStatus">
+      <span id="labBadge" class="off">斷路（電流不通）</span>
+      <span id="labWhy"></span>
     </div>
-    <div id="cards">
-      <div class="card"><h4>🔁 通路</h4><p>電路完整沒有缺口，電流可以流動 → 蜂鳴器響、會「觸電」。碰到光軌時就是這種狀態。</p></div>
-      <div class="card"><h4>✂️ 斷路</h4><p>電路有缺口，電流無法形成迴路 → 安全。圈沒碰到軌道時就是斷路。</p></div>
-      <div class="card"><h4>🔩 導體</h4><p>金屬軌道與金屬圈容易導電，是導體。兩者一接觸，電流就有路可走。</p></div>
-      <div class="card"><h4>🧤 絕緣體</h4><p>手把外層是塑膠（絕緣體），電流不易通過，所以你握著不會被電到。</p></div>
+    <div class="lab-controls">
+      <div class="ctrl-group">
+        <div class="ctrl-label">① 點電路上的「開關」</div>
+        <button class="chip" id="swChip">目前：斷開 ⨉</button>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">② 在缺口放入材料（綠=導體 橘=絕緣體）</div>
+        <div id="matChips"></div>
+      </div>
     </div>
   </div>
 
@@ -570,7 +596,7 @@ function electrocute(at){
   buzz(); flash=1;
   for(let i=0;i<18;i++){const a=Math.random()*7,s=2+Math.random()*4;
     sparks.push({x:at.x,y:at.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1});}
-  circuitFlashClosed();
+  labFlash();
   state='armed'; armPoint={...lastCp}; cur={...lastCp}; prev=null; running=false;
 }
 function doWin(){
@@ -693,9 +719,8 @@ function renderLevels(){
 
 // ---------- BGM / education toggles ----------
 const togBgm=document.getElementById('togBgm'), togEdu=document.getElementById('togEdu');
-const eduPanel=document.getElementById('edu'), circuitEl=document.getElementById('circuit');
-const statBadge=document.getElementById('statBadge'), statDesc=document.getElementById('statDesc');
-let eduMode=false, circuitTimer=null;
+const eduPanel=document.getElementById('edu');
+let eduMode=false, labTimer=null, labForce=false, swOn=false, curMat=null;
 
 const coverEl=document.getElementById('cover'), coverBtn=document.getElementById('coverBtn');
 coverBtn.addEventListener('click',()=>{
@@ -715,22 +740,62 @@ togEdu.addEventListener('click',()=>{
   togEdu.classList.toggle('on',eduMode);
   eduPanel.classList.toggle('show',eduMode);
   localStorage.setItem('jjb_edu', eduMode?'1':'0');
-  setCircuit(false);
+  if(eduMode) initLab();
 });
 
-function setCircuit(closed){
-  if(!eduMode) return;
-  circuitEl.classList.toggle('closed',closed);
-  if(closed){ statBadge.className='closed'; statBadge.textContent='通路（電流流通！）';
-    statDesc.textContent='圈碰到軌道→電路完整，電流流過，蜂鳴器響、觸電！'; }
-  else{ statBadge.className='open'; statBadge.textContent='斷路（安全）';
-    statDesc.textContent='電路有缺口，電流無法流動，蜂鳴器不響。'; }
+// ---- interactive circuit lab ----
+const MATERIALS=[
+  {n:'銅線',c:true},{n:'鐵釘',c:true},{n:'鋁箔紙',c:true},
+  {n:'橡皮擦',c:false},{n:'塑膠尺',c:false},{n:'木筷',c:false},{n:'玻璃',c:false}
+];
+function buildMatChips(){
+  const box=document.getElementById('matChips'); if(!box||box.dataset.done) return; box.dataset.done='1';
+  MATERIALS.forEach(m=>{ const b=document.createElement('button');
+    b.className='chip '+(m.c?'cond':'ins'); b.textContent=m.n;
+    b.onclick=()=>{ curMat=m; markChips(box,b); renderLab(); };
+    box.appendChild(b); });
+  const clr=document.createElement('button'); clr.className='chip'; clr.textContent='取出（清空）';
+  clr.onclick=()=>{ curMat=null; markChips(box,null); renderLab(); }; box.appendChild(clr);
 }
-function circuitFlashClosed(){
+function markChips(box,active){ [...box.children].forEach(c=>c.classList.toggle('on',c===active)); }
+function toggleSwitch(){ swOn=!swOn; renderLab(); }
+function renderLab(){
   if(!eduMode) return;
-  setCircuit(true);
-  if(circuitTimer)clearTimeout(circuitTimer);
-  circuitTimer=setTimeout(()=>setCircuit(false), 900);
+  const lab=document.getElementById('lab'); if(!lab) return;
+  const conducting = swOn && curMat && curMat.c;
+  const closed = conducting || labForce;
+  lab.classList.toggle('closed',closed); lab.classList.toggle('lit',closed);
+  const lev=document.getElementById('swLever');
+  if(swOn){ lev.setAttribute('x2','480'); lev.setAttribute('y2','110'); }
+  else    { lev.setAttribute('x2','452'); lev.setAttribute('y2','116'); }
+  document.getElementById('swChip').textContent = swOn?'目前：接通 ✓':'目前：斷開 ⨉';
+  const mg=document.getElementById('matG');
+  if(curMat){ mg.style.display='';
+    document.getElementById('matRect').setAttribute('fill', curMat.c?'rgba(57,255,158,.9)':'rgba(255,160,60,.85)');
+    document.getElementById('matText').textContent=curMat.n; }
+  else mg.style.display='none';
+  const badge=document.getElementById('labBadge'), why=document.getElementById('labWhy');
+  if(labForce){ badge.className='on'; badge.textContent='通路（電流流通！）';
+    why.textContent='遊戲中「圈」碰到了軌道，電路被接通 → 電流流過，這就是觸電的原因！'; return; }
+  let st,txt;
+  if(!swOn){ st=false; txt='開關是斷開的 → 電路有缺口，電流無法流動。先把開關按成「接通」。'; }
+  else if(!curMat){ st=false; txt='缺口沒有放任何東西 → 斷路，燈泡不亮。試著放入一個材料。'; }
+  else if(curMat.c){ st=true; txt='「'+curMat.n+'」是導體，把缺口接通了 → 通路！電流流動、燈泡亮起。'; }
+  else { st=false; txt='「'+curMat.n+'」是絕緣體，電流無法通過 → 斷路，燈泡不亮。'; }
+  badge.className=st?'on':'off';
+  badge.textContent=st?'通路（電流流通！）':'斷路（電流不通）';
+  why.textContent=txt;
+}
+function labFlash(){
+  if(!eduMode) return; labForce=true; renderLab();
+  if(labTimer)clearTimeout(labTimer); labTimer=setTimeout(()=>{labForce=false;renderLab();},900);
+}
+function initLab(){
+  buildMatChips();
+  const sw=document.getElementById('swGroup'), swChip=document.getElementById('swChip');
+  if(sw && !sw.dataset.done){ sw.dataset.done='1'; sw.addEventListener('click',toggleSwitch); }
+  if(swChip && !swChip.dataset.done){ swChip.dataset.done='1'; swChip.addEventListener('click',toggleSwitch); }
+  renderLab();
 }
 
 // ---------- quiz (education mode, shown on level clear) ----------
@@ -788,7 +853,7 @@ function updateCoverStats(){
 // init: cover screen with auto-playing demo
 L=genLevel(5); buildLevel(L); state='cover'; demoZapAt=0.35+Math.random()*0.45;
 overlay.classList.add('hidden');
-renderLevels(); setCircuit(false); updateCoverStats();
+renderLevels(); if(eduMode) initLab(); updateCoverStats();
 requestAnimationFrame(loop);
 })();
 </script>
