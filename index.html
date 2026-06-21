@@ -702,7 +702,6 @@ function loop(ts){
 // ---------- level select ----------
 const levelsEl=document.getElementById('levels');
 function renderLevels(){
-  const unlock=loadProgress();
   levelsEl.innerHTML='';
   for(let i=1;i<=TOTAL_LEVELS;i++){
     const d=document.createElement('div'); d.className='lv';
@@ -710,8 +709,7 @@ function renderLevels(){
     const b=getBest(i);
     if(i===level) d.classList.add('cur');
     if(b!==null) d.classList.add('done');
-    if(i>unlock){ d.classList.add('locked'); }
-    else d.onclick=()=>{ audio(); startLevel(i); };
+    d.onclick=()=>{ audio(); startLevel(i); };       // 任何關卡皆可直接挑戰
     if(b!==null){ const sm=document.createElement('small'); sm.textContent=b.toFixed(1)+'″'; d.appendChild(sm); }
     levelsEl.appendChild(d);
   }
