@@ -212,28 +212,43 @@ const TOTAL_LEVELS=12;
 const START_R=26, END_R=26, CP_R=15;
 
 // ---------- level path generation ----------
-function genLevel(n){ // n: 1..12
+function genLevel(n){ // n: 1..12  — serpentine (蛇形迂迴) tracks
   const lv=n-1;
-  const margin=80;
-  const segs=7+lv;                               // more wiggles each level
-  const freq=2.0 + lv*0.55;                       // oscillation frequency
-  const amp=Math.min(H/2-55, 70 + lv*14);
-  const harmonic= lv>=4 ? (0.25+lv*0.04) : 0;     // add 2nd harmonic from lv4
-  const width=Math.max(17, 46 - lv*2.6);          // corridor narrows
+  const mX=64, mY=64;
+  const x0=mX, x1=W-mX;
+  const width=Math.max(14, 44 - lv*2.6);          // corridor narrows 44→~14
+  // rows must be spaced wider than the corridor so passes don't merge into a shortcut
+  const gap=width+24;
+  const usableH=H-2*mY;
+  const maxRows=Math.max(2, Math.floor(usableH/gap)+1);
+  const rows=Math.min(maxRows, 3+Math.round(lv*0.8));   // more back-and-forth each level
+  const rowSpacing=usableH/(rows-1);
+  // intra-row wave (kept small enough to never touch the neighbouring pass)
+  const amp=Math.max(0, Math.min((rowSpacing-width)/2 - 12, 6 + lv*4));
+  const wFreq=1.5 + lv*0.5;
+  const cols=6 + Math.round(lv*0.9);              // sample density / wiggles per pass
+
   const pts=[];
-  for(let i=0;i<=segs;i++){
-    const t=i/segs;
-    const x=margin + (W-2*margin)*t;
-    let y=H/2 + amp*Math.sin(t*Math.PI*freq + lv*0.7);
-    if(harmonic) y += amp*harmonic*Math.sin(t*Math.PI*freq*2 + lv);
-    y=Math.max(margin*0.7, Math.min(H-margin*0.7, y));
-    pts.push({x,y});
+  for(let r=0;r<rows;r++){
+    const y=mY + rowSpacing*r;
+    const ltr=(r%2===0);
+    const ax=ltr?x0:x1, bx=ltr?x1:x0;
+    for(let c=0;c<=cols;c++){
+      const f=c/cols;
+      const x=ax + (bx-ax)*f;
+      let yy=y;
+      if(amp>0 && c!==0 && c!==cols)               // keep ends flat so U-turns line up
+        yy = y + amp*Math.sin(f*Math.PI*wFreq + r*1.3);
+      // higher levels: pinch the U-turns inward for tighter corners
+      pts.push({x,y:yy});
+    }
   }
-  // checkpoints: spread along interior waypoints
+
+  // checkpoints spread along the whole route
   const cps=[];
-  const nCp=Math.min(4, 1+Math.floor(lv/2));
+  const nCp=Math.min(6, 1+Math.floor(lv/1.6));
   for(let k=1;k<=nCp;k++){
-    const idx=Math.round(segs*k/(nCp+1));
+    const idx=Math.round(pts.length*k/(nCp+1));
     cps.push({x:pts[idx].x, y:pts[idx].y});
   }
   return {pts, cps, width};
