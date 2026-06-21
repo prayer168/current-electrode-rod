@@ -49,6 +49,21 @@
   .btn.ghost{background:transparent; color:var(--ink);
              border:1px solid rgba(120,160,255,.4); box-shadow:none;}
 
+  /* cover / title screen */
+  #cover{position:absolute; inset:0; z-index:5; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; gap:8px; text-align:center;
+         background:radial-gradient(circle at 50% 42%, rgba(7,11,22,.5), rgba(7,11,22,.86));}
+  #cover.hidden{display:none;}
+  .cv-title{font-size:clamp(34px,9vw,74px); font-weight:900; letter-spacing:5px; color:#fff;
+            animation:cvpulse 2s ease-in-out infinite;}
+  @keyframes cvpulse{0%,100%{text-shadow:0 0 16px var(--neon),0 0 40px var(--neon2);}
+                     50%{text-shadow:0 0 30px var(--neon),0 0 74px var(--neon2);}}
+  .cv-sub{font-size:clamp(13px,3vw,18px); opacity:.85; letter-spacing:2px;}
+  .cv-btn{margin-top:12px; font-size:18px; padding:14px 36px; animation:cvbtn 1.6s ease-in-out infinite;}
+  @keyframes cvbtn{0%,100%{box-shadow:0 0 18px rgba(25,224,255,.55);}
+                   50%{box-shadow:0 0 38px rgba(25,224,255,1);}}
+  .cv-demo{font-size:12px; opacity:.5; margin-top:8px; letter-spacing:1px;}
+
   #levels{display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
           margin:12px 0 30px; width:96%; max-width:1000px;}
   .lv{width:46px; height:46px; border-radius:10px; cursor:pointer; font-weight:700;
@@ -128,6 +143,12 @@
       <p id="ovMsg"></p>
       <div id="ovQuiz"></div>
       <button class="btn" id="ovBtn">開始</button>
+    </div>
+    <div id="cover">
+      <div class="cv-title">⚡ 電流急急棒</div>
+      <div class="cv-sub">手要穩！沿著光軌移動，別碰到邊緣</div>
+      <button class="btn cv-btn" id="coverBtn">▶ 開始遊戲</button>
+      <div class="cv-demo">⚡ 示範播放中…</div>
     </div>
   </div>
 
@@ -382,6 +403,7 @@ function setBest(n,t){ const b=getBest(n); if(b===null||t<b) localStorage.setIte
 
 // ---------- level setup ----------
 function startLevel(n){
+  document.getElementById('cover').classList.add('hidden');
   level=n; L=genLevel(n); buildLevel(L);
   state='armed';
   armPoint={...L.pts[0]};
@@ -421,6 +443,19 @@ function maskAlpha(x,y){
   return mctx.getImageData(x|0,y|0,1,1).data[3];
 }
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+// position at fraction t (0..1) along a polyline by cumulative length
+function posAlong(pts,t){
+  let total=0; const seg=[];
+  for(let i=1;i<pts.length;i++){ const d=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y); seg.push(d); total+=d; }
+  let target=t*total, acc=0;
+  for(let i=1;i<pts.length;i++){
+    if(acc+seg[i-1]>=target){ const f=seg[i-1]?(target-acc)/seg[i-1]:0;
+      return {x:pts[i-1].x+(pts[i].x-pts[i-1].x)*f, y:pts[i-1].y+(pts[i].y-pts[i-1].y)*f}; }
+    acc+=seg[i-1];
+  }
+  return {x:pts[pts.length-1].x, y:pts[pts.length-1].y};
+}
+let demoT=0, demoDir=1;
 
 cv.addEventListener('pointerdown',e=>{
   audio(); pointerType=e.pointerType||'mouse'; e.preventDefault();
@@ -484,6 +519,24 @@ function doWin(){
 // ---------- main loop ----------
 function loop(ts){
   const dt=lastT?(ts-lastT)/1000:0; lastT=ts;
+
+  // cover screen: auto-playing demo
+  if(state==='cover'){
+    ctx.clearRect(0,0,W,H);
+    ctx.drawImage(trackCv,0,0,W,H);
+    demoT += demoDir*dt*0.16;
+    if(demoT>=1){demoT=1;demoDir=-1;} else if(demoT<=0){demoT=0;demoDir=1;}
+    for(let k=7;k>=1;k--){ const tt=Math.max(0,Math.min(1,demoT-demoDir*k*0.018)); const tp=posAlong(L.pts,tt);
+      ctx.save(); ctx.globalAlpha=.06*k; ctx.fillStyle=getC('--neon'); ctx.shadowColor=getC('--neon'); ctx.shadowBlur=14;
+      ctx.beginPath(); ctx.arc(tp.x,tp.y,9,0,7); ctx.fill(); ctx.restore(); }
+    const p=posAlong(L.pts,demoT);
+    ctx.save(); ctx.shadowColor=getC('--neon'); ctx.shadowBlur=26; ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(p.x,p.y,8,0,7); ctx.fill();
+    ctx.strokeStyle=getC('--neon'); ctx.lineWidth=3; ctx.beginPath(); ctx.arc(p.x,p.y,15,0,7); ctx.stroke();
+    ctx.restore();
+    requestAnimationFrame(loop); return;
+  }
+
   if(running && state==='playing') elapsed+=dt;
   document.getElementById('hTime').textContent=elapsed.toFixed(1)+'″';
 
@@ -552,6 +605,14 @@ const togBgm=document.getElementById('togBgm'), togEdu=document.getElementById('
 const eduPanel=document.getElementById('edu'), circuitEl=document.getElementById('circuit');
 const statBadge=document.getElementById('statBadge'), statDesc=document.getElementById('statDesc');
 let eduMode=false, circuitTimer=null;
+
+const coverEl=document.getElementById('cover'), coverBtn=document.getElementById('coverBtn');
+coverBtn.addEventListener('click',()=>{
+  audio();
+  if(localStorage.getItem('jjb_bgm')==='1' && !bgmOn){ startBGM(); togBgm.classList.add('on'); }
+  coverEl.classList.add('hidden');
+  startLevel(1);
+});
 
 togBgm.addEventListener('click',()=>{
   audio();
@@ -623,9 +684,10 @@ document.getElementById('ctrlHint').textContent=
 if(localStorage.getItem('jjb_edu')==='1'){ eduMode=true; togEdu.classList.add('on'); eduPanel.classList.add('show'); }
 // (BGM autostart blocked by browsers until a user gesture; reflect saved intent on first click)
 
-// init
-startLevel(1);
-setCircuit(false);
+// init: cover screen with auto-playing demo
+L=genLevel(5); buildLevel(L); state='cover';
+overlay.classList.add('hidden');
+renderLevels(); setCircuit(false);
 requestAnimationFrame(loop);
 })();
 </script>
