@@ -59,6 +59,50 @@
   .lv.locked{opacity:.35; cursor:not-allowed;}
   .lv small{position:absolute; bottom:-16px; font-size:9px; opacity:.6; white-space:nowrap;}
   .hint{font-size:12px; opacity:.55; margin:4px 0 0; text-align:center;}
+
+  /* control bar */
+  #controls{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:8px;}
+  .tog{cursor:pointer; border:1px solid rgba(120,160,255,.4); background:rgba(20,30,60,.6);
+       color:var(--ink); border-radius:20px; padding:7px 16px; font-size:13px; font-weight:600;}
+  .tog.on{background:linear-gradient(180deg,var(--neon),#0bb9e0); color:#031019; border-color:transparent;
+          box-shadow:0 0 14px rgba(25,224,255,.5);}
+  .tog:active{transform:scale(.96);}
+
+  /* quiz in overlay */
+  #ovQuiz{display:flex; flex-direction:column; gap:8px; width:100%; max-width:420px;}
+  #ovQuiz .q{font-size:16px; font-weight:600; color:#fff; margin-bottom:2px;}
+  #ovQuiz .opt{cursor:pointer; border:1px solid rgba(120,160,255,.4); background:rgba(20,30,60,.7);
+       color:var(--ink); border-radius:10px; padding:10px 14px; font-size:15px; text-align:left;}
+  #ovQuiz .opt.right{background:rgba(57,255,158,.25); border-color:var(--green); color:#fff;}
+  #ovQuiz .opt.wrong{background:rgba(255,59,92,.25); border-color:var(--red);}
+  #ovQuiz .exp{font-size:13px; opacity:.85; line-height:1.5; min-height:1px;}
+
+  /* education panel */
+  #edu{display:none; width:96%; max-width:1000px; margin-top:12px;
+       background:rgba(13,21,48,.6); border:1px solid rgba(90,150,255,.25); border-radius:14px; padding:14px;}
+  #edu.show{display:block;}
+  #edu .top{display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:center;}
+  #circuitWrap{flex:1; min-width:280px; max-width:480px;}
+  #circuit{width:100%; height:auto;}
+  #circuit .wire{stroke:#43589a; stroke-width:5; fill:none; stroke-linecap:round;}
+  #circuit .flow{stroke:var(--neon); stroke-width:5; fill:none; stroke-dasharray:9 13; opacity:0;}
+  #circuit.closed .flow{opacity:1; animation:flow .5s linear infinite;}
+  @keyframes flow{to{stroke-dashoffset:-22;}}
+  #circuit .bridge{stroke:var(--neon); stroke-width:5; opacity:0;}
+  #circuit.closed .bridge{opacity:1;}
+  #circuit .buzz{fill:#22304f; stroke:#43589a; stroke-width:3;}
+  #circuit.closed .buzz{fill:var(--red); stroke:var(--red); filter:drop-shadow(0 0 8px var(--red));}
+  #circuit .ring{fill:none; stroke:var(--gold); stroke-width:4;}
+  #circuit text{fill:var(--ink); font-size:13px; font-family:system-ui;}
+  #stat{min-width:150px; text-align:center;}
+  #statBadge{font-size:20px; font-weight:800; padding:8px 14px; border-radius:10px; display:inline-block;}
+  #statBadge.open{color:var(--green); background:rgba(57,255,158,.12); border:1px solid rgba(57,255,158,.4);}
+  #statBadge.closed{color:var(--red); background:rgba(255,59,92,.15); border:1px solid rgba(255,59,92,.5);}
+  #statDesc{font-size:13px; opacity:.8; margin-top:6px; line-height:1.5;}
+  #cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-top:12px;}
+  .card{background:rgba(20,30,60,.5); border:1px solid rgba(90,150,255,.2); border-radius:10px; padding:10px 12px;}
+  .card h4{margin:0 0 4px; font-size:14px; color:var(--neon);}
+  .card p{margin:0; font-size:12.5px; opacity:.82; line-height:1.5;}
 </style>
 </head>
 <body>
@@ -72,12 +116,56 @@
     <div class="stat"><b id="hZap">0</b><span>觸電</span></div>
   </div>
 
+  <div id="controls">
+    <button class="tog" id="togBgm">🎵 背景音樂</button>
+    <button class="tog" id="togEdu">📚 教學模式</button>
+  </div>
+
   <div id="stage">
     <canvas id="game"></canvas>
     <div id="overlay">
       <h2 id="ovTitle">準備好了嗎？</h2>
       <p id="ovMsg"></p>
+      <div id="ovQuiz"></div>
       <button class="btn" id="ovBtn">開始</button>
+    </div>
+  </div>
+
+  <div id="edu">
+    <div class="top">
+      <div id="circuitWrap">
+        <svg id="circuit" viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg">
+          <!-- rectangular circuit loop -->
+          <path class="wire" d="M70 130 H410 V90"/>
+          <path class="wire" d="M410 70 V40 H70 V130"/>
+          <!-- moving current overlay (same loop) -->
+          <path class="flow" d="M70 130 H410 V90 M410 70 V40 H70 V130"/>
+          <!-- gap bridge on right side -->
+          <line class="bridge" x1="410" y1="70" x2="410" y2="90"/>
+          <!-- battery (bottom) -->
+          <line class="wire" x1="225" y1="118" x2="225" y2="142"/>
+          <line class="wire" x1="240" y1="124" x2="240" y2="136"/>
+          <text x="248" y="139">電池</text>
+          <!-- buzzer (top) -->
+          <circle class="buzz" cx="240" cy="40" r="14"/>
+          <text x="232" y="45" style="font-size:15px">🔔</text>
+          <text x="258" y="34">蜂鳴器</text>
+          <!-- contact area: track + ring -->
+          <text x="318" y="22">軌道(導體)</text>
+          <circle class="ring" cx="410" cy="80" r="10"/>
+          <text x="424" y="84">圈</text>
+        </svg>
+      </div>
+      <div id="stat">
+        <span id="statBadge" class="open">斷路（安全）</span>
+        <div id="statDesc">電路有缺口，電流無法流動，蜂鳴器不響。</div>
+      </div>
+    </div>
+    <div id="cards">
+      <div class="card"><h4>🔁 通路</h4><p>電路完整沒有缺口，電流可以流動 → 蜂鳴器響、會「觸電」。碰到光軌時就是這種狀態。</p></div>
+      <div class="card"><h4>✂️ 斷路</h4><p>電路有缺口，電流無法形成迴路 → 安全。圈沒碰到軌道時就是斷路。</p></div>
+      <div class="card"><h4>🔩 導體</h4><p>金屬軌道與金屬圈容易導電，是導體。兩者一接觸，電流就有路可走。</p></div>
+      <div class="card"><h4>🧤 絕緣體</h4><p>手把外層是塑膠（絕緣體），電流不易通過，所以你握著不會被電到。</p></div>
     </div>
   </div>
 
@@ -213,7 +301,8 @@ function getC(v){return getComputedStyle(document.documentElement).getPropertyVa
 
 // ---------- audio ----------
 let AC=null;
-function audio(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function audio(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  if(AC&&AC.state==='suspended') AC.resume(); return AC; }
 function buzz(){
   const a=audio(); if(!a)return; const t=a.currentTime;
   // sawtooth gritty + noise
@@ -236,6 +325,42 @@ function tone(freq,dur,when,type='sine',vol=.3){
 }
 function win(){ [523,659,784,1047].forEach((f,i)=>tone(f,.22,i*.1,'triangle',.35)); }
 function blip(){ tone(880,.12,0,'square',.25); }
+
+// ---------- looping BGM (synth) ----------
+let bgmOn=false, bgmGain=null, bgmTimer=null, bgmStep=0, bgmNext=0;
+const STEP_DUR=0.19;
+// Am - F - C - G  (4 steps each = 16-step loop)
+const CHORDS=[[220,261.63,329.63],[174.61,220,261.63],[261.63,329.63,392],[196,246.94,293.66]];
+const BASS=[110,87.31,65.41,98];
+const ARP=[0,1,2,1];
+function bgmNote(freq,t,dur,type,vol){
+  const a=audio(); if(!a||!bgmGain)return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.value=freq;
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(bgmGain); o.start(t); o.stop(t+dur+.02);
+}
+function bgmScheduler(){
+  if(!bgmOn)return; const a=audio(); if(!a)return;
+  while(bgmNext < a.currentTime+0.2){
+    const ci=Math.floor(bgmStep/4)%4;
+    if(bgmStep%4===0) bgmNote(BASS[ci], bgmNext, .42, 'triangle', .55);
+    bgmNote(CHORDS[ci][ARP[bgmStep%4]], bgmNext, .22, 'sine', .32);
+    if(bgmStep%2===0) bgmNote(CHORDS[ci][2]*2, bgmNext, .12, 'square', .06); // sparkle
+    bgmNext += STEP_DUR; bgmStep=(bgmStep+1)%16;
+  }
+  bgmTimer=setTimeout(bgmScheduler, 45);
+}
+function startBGM(){
+  const a=audio(); if(!a)return; bgmOn=true;
+  bgmGain=a.createGain(); bgmGain.gain.value=.14; bgmGain.connect(a.destination);
+  bgmStep=0; bgmNext=a.currentTime+0.08; bgmScheduler();
+}
+function stopBGM(){
+  bgmOn=false; if(bgmTimer)clearTimeout(bgmTimer);
+  const a=audio(); if(a&&bgmGain){ try{bgmGain.gain.setTargetAtTime(0,a.currentTime,.05);}catch(e){} }
+}
 
 // ---------- state ----------
 let level=1, L=null;
@@ -278,6 +403,7 @@ function showOverlay(title,msg,btn,color){
   overlay.classList.remove('hidden');
   ovTitle.textContent=title; ovTitle.style.color=color||'#fff';
   ovMsg.innerHTML=msg; ovBtn.textContent=btn;
+  document.getElementById('ovQuiz').innerHTML=''; ovBtn.style.display='';
 }
 function hideOverlay(){ overlay.classList.add('hidden'); }
 ovBtn.addEventListener('click',()=>{ audio(); hideOverlay(); });
@@ -337,6 +463,7 @@ function electrocute(at){
   buzz(); flash=1;
   for(let i=0;i<18;i++){const a=Math.random()*7,s=2+Math.random()*4;
     sparks.push({x:at.x,y:at.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1});}
+  circuitFlashClosed();
   state='armed'; armPoint={...lastCp}; cur={...lastCp}; prev=null; running=false;
 }
 function doWin(){
@@ -348,7 +475,9 @@ function doWin(){
   const isLast=level>=TOTAL_LEVELS;
   let msg='用時 <b>'+elapsed.toFixed(2)+'″</b>　最佳 '+b.toFixed(2)+'″<br>觸電 '+zaps+' 次';
   showOverlay(isLast?'🏆 全破關！':'✅ 過關！', msg, isLast?'回到第 1 關':'下一關', getC('--green'));
-  ovBtn.onclick=()=>{ audio(); hideOverlay(); startLevel(isLast?1:level+1); ovBtn.onclick=null; };
+  const proceed=()=>{ hideOverlay(); startLevel(isLast?1:level+1); ovBtn.onclick=null; };
+  if(eduMode){ showQuiz(level-1, proceed); }
+  else { ovBtn.onclick=()=>{ audio(); proceed(); }; }
   renderLevels();
 }
 
@@ -418,14 +547,85 @@ function renderLevels(){
   }
 }
 
+// ---------- BGM / education toggles ----------
+const togBgm=document.getElementById('togBgm'), togEdu=document.getElementById('togEdu');
+const eduPanel=document.getElementById('edu'), circuitEl=document.getElementById('circuit');
+const statBadge=document.getElementById('statBadge'), statDesc=document.getElementById('statDesc');
+let eduMode=false, circuitTimer=null;
+
+togBgm.addEventListener('click',()=>{
+  audio();
+  if(bgmOn){ stopBGM(); togBgm.classList.remove('on'); localStorage.setItem('jjb_bgm','0'); }
+  else{ startBGM(); togBgm.classList.add('on'); localStorage.setItem('jjb_bgm','1'); }
+});
+togEdu.addEventListener('click',()=>{
+  eduMode=!eduMode;
+  togEdu.classList.toggle('on',eduMode);
+  eduPanel.classList.toggle('show',eduMode);
+  localStorage.setItem('jjb_edu', eduMode?'1':'0');
+  setCircuit(false);
+});
+
+function setCircuit(closed){
+  if(!eduMode) return;
+  circuitEl.classList.toggle('closed',closed);
+  if(closed){ statBadge.className='closed'; statBadge.textContent='通路（電流流通！）';
+    statDesc.textContent='圈碰到軌道→電路完整，電流流過，蜂鳴器響、觸電！'; }
+  else{ statBadge.className='open'; statBadge.textContent='斷路（安全）';
+    statDesc.textContent='電路有缺口，電流無法流動，蜂鳴器不響。'; }
+}
+function circuitFlashClosed(){
+  if(!eduMode) return;
+  setCircuit(true);
+  if(circuitTimer)clearTimeout(circuitTimer);
+  circuitTimer=setTimeout(()=>setCircuit(false), 900);
+}
+
+// ---------- quiz (education mode, shown on level clear) ----------
+const QUIZ=[
+  {q:'碰到光軌會觸電，是因為電路形成了什麼？',o:['通路（完整電路）','斷路（有缺口）'],c:0,e:'圈碰到軌道讓電流有完整路徑→通路，電流流通才會觸電。'},
+  {q:'手把外層常包塑膠，塑膠是？',o:['導體','絕緣體'],c:1,e:'塑膠是絕緣體，電流不易通過，握著才不會被電到。'},
+  {q:'金屬軌道和金屬圈屬於？',o:['導體','絕緣體'],c:0,e:'金屬是導體，容易讓電流通過。'},
+  {q:'電流要能流動，電路必須是？',o:['斷路','通路'],c:1,e:'只有通路（完整迴路）電流才能流動。'},
+  {q:'下列何者電流「無法」流動？',o:['通路','斷路'],c:1,e:'斷路有缺口，電流無法形成迴路。'},
+  {q:'橡皮、玻璃、乾木頭大多是？',o:['絕緣體','導體'],c:0,e:'它們不易導電，是絕緣體。'},
+  {q:'為什麼維修電器前要先拔插頭？',o:['讓電路變成斷路','讓電路變成通路'],c:0,e:'拔插頭造成斷路，沒有電流流過才安全。'},
+  {q:'人體流汗時比較容易導電，因為汗水讓人體更像？',o:['絕緣體','導體'],c:1,e:'潮濕讓人體更易導電，更危險，所以濕手別碰電器。'},
+];
+function showQuiz(idx, onDone){
+  const item=QUIZ[idx%QUIZ.length];
+  const box=document.getElementById('ovQuiz'); box.innerHTML='';
+  const q=document.createElement('div'); q.className='q'; q.textContent='🧠 '+item.q; box.appendChild(q);
+  const exp=document.createElement('div'); exp.className='exp';
+  const btns=[];
+  item.o.forEach((txt,i)=>{
+    const b=document.createElement('button'); b.className='opt'; b.textContent=txt;
+    b.onclick=()=>{
+      btns.forEach(x=>x.disabled=true);
+      if(i===item.c){ b.classList.add('right'); tone(880,.12,0,'square',.25); }
+      else{ b.classList.add('wrong'); btns[item.c].classList.add('right'); buzz(); }
+      exp.textContent='💡 '+item.e;
+      ovBtn.style.display=''; ovBtn.onclick=()=>{ audio(); box.innerHTML=''; onDone(); ovBtn.onclick=null; };
+    };
+    btns.push(b); box.appendChild(b);
+  });
+  box.appendChild(exp);
+  ovBtn.style.display='none'; // hide until answered
+}
+
 // hint text by device
 document.getElementById('ctrlHint').textContent=
   (matchMedia('(pointer:coarse)').matches)
     ? '📱 手指按住拖曳，控制點在手指上方一點（不會被遮住）'
     : '🖱️ 按住滑鼠左鍵沿光軌移動，放開或碰邊會退回最近檢查點';
 
+// restore preferences
+if(localStorage.getItem('jjb_edu')==='1'){ eduMode=true; togEdu.classList.add('on'); eduPanel.classList.add('show'); }
+// (BGM autostart blocked by browsers until a user gesture; reflect saved intent on first click)
+
 // init
 startLevel(1);
+setCircuit(false);
 requestAnimationFrame(loop);
 })();
 </script>
