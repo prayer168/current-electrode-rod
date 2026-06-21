@@ -212,45 +212,101 @@ const TOTAL_LEVELS=12;
 const START_R=26, END_R=26, CP_R=15;
 
 // ---------- level path generation ----------
-function genLevel(n){ // n: 1..12  — serpentine (蛇形迂迴) tracks
-  const lv=n-1;
-  const mX=64, mY=64;
-  const x0=mX, x1=W-mX;
-  const width=Math.max(14, 44 - lv*2.6);          // corridor narrows 44→~14
-  // rows must be spaced wider than the corridor so passes don't merge into a shortcut
-  const gap=width+24;
-  const usableH=H-2*mY;
-  const maxRows=Math.max(2, Math.floor(usableH/gap)+1);
-  const rows=Math.min(maxRows, 3+Math.round(lv*0.8));   // more back-and-forth each level
-  const rowSpacing=usableH/(rows-1);
-  // intra-row wave (kept small enough to never touch the neighbouring pass)
-  const amp=Math.max(0, Math.min((rowSpacing-width)/2 - 12, 6 + lv*4));
-  const wFreq=1.5 + lv*0.5;
-  const cols=6 + Math.round(lv*0.9);              // sample density / wiggles per pass
-
-  const pts=[];
+// ---- path primitives ----
+function densify(A,step){
+  const P=[{x:A[0].x,y:A[0].y}];
+  for(let i=1;i<A.length;i++){ const a=A[i-1],b=A[i];
+    const d=Math.hypot(b.x-a.x,b.y-a.y), n=Math.max(1,Math.round(d/step));
+    for(let j=1;j<=n;j++) P.push({x:a.x+(b.x-a.x)*j/n, y:a.y+(b.y-a.y)*j/n}); }
+  return P;
+}
+function arcSeg(P,cx,cy,r,a0,a1,step){
+  const n=Math.max(2,Math.round(Math.abs(a1-a0)*r/step));
+  for(let i=1;i<=n;i++){ const a=a0+(a1-a0)*i/n; P.push({x:cx+Math.cos(a)*r,y:cy+Math.sin(a)*r}); }
+}
+// ---- shape generators (each returns a dense centreline polyline) ----
+function shapeSerpentineH(b,rows){
+  const A=[], sp=(b.y1-b.y0)/(rows-1), rad=sp/2, xl=b.x0+rad, xr=b.x1-rad;
   for(let r=0;r<rows;r++){
-    const y=mY + rowSpacing*r;
-    const ltr=(r%2===0);
-    const ax=ltr?x0:x1, bx=ltr?x1:x0;
-    for(let c=0;c<=cols;c++){
-      const f=c/cols;
-      const x=ax + (bx-ax)*f;
-      let yy=y;
-      if(amp>0 && c!==0 && c!==cols)               // keep ends flat so U-turns line up
-        yy = y + amp*Math.sin(f*Math.PI*wFreq + r*1.3);
-      // higher levels: pinch the U-turns inward for tighter corners
-      pts.push({x,y:yy});
-    }
-  }
+    const y=b.y0+sp*r, ltr=r%2===0, xs=ltr?xl:xr, xe=ltr?xr:xl;
+    if(r===0)A.push({x:xs,y}); A.push({x:xe,y});
+    if(r<rows-1){ if(ltr)arcSeg(A,xe,y+rad,rad,-Math.PI/2,Math.PI/2,7);
+                  else   arcSeg(A,xe,y+rad,rad,-Math.PI/2,-Math.PI*1.5,7); }
+  } return densify(A,7);
+}
+function shapeSerpentineV(b,cols){
+  const A=[], sp=(b.x1-b.x0)/(cols-1), rad=sp/2, yt=b.y0+rad, yb=b.y1-rad;
+  for(let c=0;c<cols;c++){
+    const x=b.x0+sp*c, ttb=c%2===0, ys=ttb?yt:yb, ye=ttb?yb:yt;
+    if(c===0)A.push({x,y:ys}); A.push({x,y:ye});
+    if(c<cols-1){ if(ttb)arcSeg(A,x+rad,yb,rad,Math.PI,0,7);
+                  else    arcSeg(A,x+rad,yt,rad,Math.PI,2*Math.PI,7); }
+  } return densify(A,7);
+}
+function shapeZigzag(b,peaks){
+  const A=[]; for(let i=0;i<=peaks;i++) A.push({x:b.x0+(b.x1-b.x0)*i/peaks, y:(i%2===0)?b.y0:b.y1});
+  return densify(A,7);
+}
+function shapeZigzagV(b,peaks){
+  const A=[]; for(let i=0;i<=peaks;i++) A.push({x:(i%2===0)?b.x0:b.x1, y:b.y0+(b.y1-b.y0)*i/peaks});
+  return densify(A,7);
+}
+function shapeSquare(b,cycles){
+  const A=[{x:b.x0,y:b.y0}]; let cx=b.x0,cy=b.y0; const n=cycles*2, sx=(b.x1-b.x0)/n;
+  for(let i=0;i<n;i++){ cx+=sx; A.push({x:cx,y:cy}); cy=(cy===b.y0)?b.y1:b.y0; A.push({x:cx,y:cy}); }
+  return densify(A,7);
+}
+function shapeSquareV(b,cycles){
+  const A=[{x:b.x0,y:b.y0}]; let cx=b.x0,cy=b.y0; const n=cycles*2, sy=(b.y1-b.y0)/n;
+  for(let i=0;i<n;i++){ cy+=sy; A.push({x:cx,y:cy}); cx=(cx===b.x0)?b.x1:b.x0; A.push({x:cx,y:cy}); }
+  return densify(A,7);
+}
+function shapeStaircase(b,steps){
+  const A=[{x:b.x0,y:b.y0}]; const sx=(b.x1-b.x0)/steps, sy=(b.y1-b.y0)/steps; let x=b.x0,y=b.y0;
+  for(let i=0;i<steps;i++){ x+=sx; A.push({x,y}); y+=sy; A.push({x,y}); }
+  return densify(A,7);
+}
+function shapeSawtooth(b,teeth){
+  const A=[{x:b.x0,y:b.y1}]; const sx=(b.x1-b.x0)/teeth;
+  for(let i=0;i<teeth;i++){ const xb=b.x0+sx*(i+1); A.push({x:xb,y:b.y0}); A.push({x:xb,y:b.y1}); }
+  return densify(A,7);
+}
+function shapeSpiral(b,ringGap){
+  let l=b.x0,r=b.x1,t=b.y0,bm=b.y1; const A=[{x:l,y:t}]; let g=0;
+  while(r-l>ringGap*1.5 && bm-t>ringGap*1.5 && g++<80){
+    A.push({x:r,y:t}); A.push({x:r,y:bm}); A.push({x:l,y:bm}); A.push({x:l,y:t+ringGap});
+    l+=ringGap; t+=ringGap; r-=ringGap; bm-=ringGap; A.push({x:l,y:t});
+  } return densify(A,7);
+}
 
-  // checkpoints spread along the whole route
-  const cps=[];
-  const nCp=Math.min(6, 1+Math.floor(lv/1.6));
-  for(let k=1;k<=nCp;k++){
-    const idx=Math.round(pts.length*k/(nCp+1));
-    cps.push({x:pts[idx].x, y:pts[idx].y});
+function genLevel(n){ // n:1..12 — each level a distinct track shape
+  const idx=n-1, mX=60, mY=60;
+  const b={x0:mX, x1:W-mX, y0:mY, y1:H-mY};
+  const width=Math.max(16, 40 - idx*1.8);   // corridor narrows with level
+  const SAFE=width+22;                       // min spacing between parallel passes
+  const maxRows=Math.max(2,Math.floor((b.y1-b.y0)/SAFE)+1);
+  const maxCols=Math.max(2,Math.floor((b.x1-b.x0)/SAFE)+1);
+  const maxPk =Math.max(3,Math.floor(2*(b.x1-b.x0)/SAFE));
+  const maxPkV=Math.max(3,Math.floor(2*(b.y1-b.y0)/SAFE));
+  const maxCyc=Math.max(2,Math.floor((b.x1-b.x0)/(2*SAFE)));
+  const maxCycV=Math.max(2,Math.floor((b.y1-b.y0)/(2*SAFE)));
+  let pts;
+  switch(n){
+    case 1:  pts=shapeSerpentineH(b, Math.min(3,maxRows)); break;  // 蛇形
+    case 2:  pts=shapeZigzag(b, Math.min(5,maxPk)); break;          // 尖鋸齒
+    case 3:  pts=shapeSquare(b, Math.min(3,maxCyc)); break;         // 方波
+    case 4:  pts=shapeSerpentineV(b, Math.min(3,maxCols)); break;   // 垂直蛇形
+    case 5:  pts=shapeStaircase(b, 6); break;                       // 階梯
+    case 6:  pts=shapeSpiral(b, SAFE); break;                       // 漩渦
+    case 7:  pts=shapeSawtooth(b, Math.min(5,maxPk)); break;        // 鋸齒坡
+    case 8:  pts=shapeZigzagV(b, Math.min(6,maxPkV)); break;        // 垂直鋸齒
+    case 9:  pts=shapeSquare(b, Math.min(5,maxCyc)); break;         // 細方波
+    case 10: pts=shapeSerpentineH(b, Math.min(6,maxRows)); break;   // 密蛇形
+    case 11: pts=shapeSquareV(b, Math.min(5,maxCycV)); break;       // 垂直方波
+    default: pts=shapeZigzag(b, Math.min(9,maxPk)); break;          // 密尖鋸齒
   }
+  const cps=[]; const nCp=Math.min(6, 1+Math.floor(idx/1.6));
+  for(let k=1;k<=nCp;k++){ const i=Math.round(pts.length*k/(nCp+1)); cps.push({x:pts[i].x,y:pts[i].y}); }
   return {pts, cps, width};
 }
 
