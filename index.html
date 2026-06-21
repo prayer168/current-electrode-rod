@@ -391,7 +391,7 @@ function bgmScheduler(){
 }
 function startBGM(){
   const a=audio(); if(!a)return; bgmOn=true;
-  bgmGain=a.createGain(); bgmGain.gain.value=.14; bgmGain.connect(a.destination);
+  bgmGain=a.createGain(); bgmGain.gain.value=.35; bgmGain.connect(a.destination);
   bgmStep=0; bgmNext=a.currentTime+0.08; bgmScheduler();
 }
 function stopBGM(){
