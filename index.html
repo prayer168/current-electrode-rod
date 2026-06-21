@@ -148,6 +148,7 @@
       <div class="cv-title">⚡ 電流急急棒</div>
       <div class="cv-sub">手要穩！沿著光軌移動，別碰到邊緣</div>
       <button class="btn cv-btn" id="coverBtn">▶ 開始遊戲</button>
+      <div class="cv-demo" id="coverStats"></div>
       <div class="cv-demo">⚡ 示範播放中…</div>
     </div>
   </div>
@@ -455,7 +456,7 @@ function posAlong(pts,t){
   }
   return {x:pts[pts.length-1].x, y:pts[pts.length-1].y};
 }
-let demoT=0, demoDir=1;
+let demoT=0, demoDir=1, demoZapAt=0.5, demoZapped=false;
 
 cv.addEventListener('pointerdown',e=>{
   audio(); pointerType=e.pointerType||'mouse'; e.preventDefault();
@@ -520,20 +521,39 @@ function doWin(){
 function loop(ts){
   const dt=lastT?(ts-lastT)/1000:0; lastT=ts;
 
-  // cover screen: auto-playing demo
+  // cover screen: auto-playing demo (with dramatic zap)
   if(state==='cover'){
     ctx.clearRect(0,0,W,H);
     ctx.drawImage(trackCv,0,0,W,H);
-    demoT += demoDir*dt*0.16;
-    if(demoT>=1){demoT=1;demoDir=-1;} else if(demoT<=0){demoT=0;demoDir=1;}
-    for(let k=7;k>=1;k--){ const tt=Math.max(0,Math.min(1,demoT-demoDir*k*0.018)); const tp=posAlong(L.pts,tt);
+    demoT += dt*0.15;
+    // dramatic touch: deviate off-track once per lap → spark + red flash → restart
+    if(!demoZapped && demoT>=demoZapAt){
+      demoZapped=true; flash=1;
+      const zp=posAlong(L.pts,demoZapAt);
+      for(let i=0;i<22;i++){ const a=Math.random()*7, s=2+Math.random()*4;
+        sparks.push({x:zp.x,y:zp.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1}); }
+      demoT=0;                                   // zap → back to start
+    }
+    if(demoT>=1){ demoT=0; demoZapped=false; demoZapAt=0.35+Math.random()*0.45; }
+    const tNow=Math.min(1,demoT);
+    const p=posAlong(L.pts,tNow), pa=posAlong(L.pts,Math.min(1,tNow+0.012));
+    const ang=Math.atan2(pa.y-p.y,pa.x-p.x)+Math.PI/2, wob=4*Math.sin(ts/110);
+    const px=p.x+Math.cos(ang)*wob, py=p.y+Math.sin(ang)*wob;  // hand-controlled wobble
+    for(let k=7;k>=1;k--){ const tp=posAlong(L.pts,Math.max(0,tNow-k*0.016));
       ctx.save(); ctx.globalAlpha=.06*k; ctx.fillStyle=getC('--neon'); ctx.shadowColor=getC('--neon'); ctx.shadowBlur=14;
       ctx.beginPath(); ctx.arc(tp.x,tp.y,9,0,7); ctx.fill(); ctx.restore(); }
-    const p=posAlong(L.pts,demoT);
     ctx.save(); ctx.shadowColor=getC('--neon'); ctx.shadowBlur=26; ctx.fillStyle='#fff';
-    ctx.beginPath(); ctx.arc(p.x,p.y,8,0,7); ctx.fill();
-    ctx.strokeStyle=getC('--neon'); ctx.lineWidth=3; ctx.beginPath(); ctx.arc(p.x,p.y,15,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px,py,8,0,7); ctx.fill();
+    ctx.strokeStyle=getC('--neon'); ctx.lineWidth=3; ctx.beginPath(); ctx.arc(px,py,15,0,7); ctx.stroke();
     ctx.restore();
+    // sparks
+    sparks.forEach(s=>{ s.x+=s.vx; s.y+=s.vy; s.vy+=.15; s.life-=.04; });
+    sparks=sparks.filter(s=>s.life>0);
+    sparks.forEach(s=>{ ctx.save(); ctx.globalAlpha=Math.max(0,s.life);
+      ctx.fillStyle=getC('--gold'); ctx.shadowColor=getC('--gold'); ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(s.x,s.y,2.5,0,7); ctx.fill(); ctx.restore(); });
+    if(flash>0){ ctx.save(); ctx.globalAlpha=flash*0.5; ctx.fillStyle=getC('--red');
+      ctx.fillRect(0,0,W,H); ctx.restore(); flash-=0.04; }
     requestAnimationFrame(loop); return;
   }
 
@@ -684,10 +704,20 @@ document.getElementById('ctrlHint').textContent=
 if(localStorage.getItem('jjb_edu')==='1'){ eduMode=true; togEdu.classList.add('on'); eduPanel.classList.add('show'); }
 // (BGM autostart blocked by browsers until a user gesture; reflect saved intent on first click)
 
+function updateCoverStats(){
+  let cleared=0, sum=0;
+  for(let i=1;i<=TOTAL_LEVELS;i++){ const b=getBest(i); if(b!=null){ cleared++; sum+=b; } }
+  const el=document.getElementById('coverStats');
+  if(cleared===0){ el.textContent=''; return; }
+  el.textContent = cleared===TOTAL_LEVELS
+    ? '🏆 全破關！總計 '+sum.toFixed(1)+'″'
+    : '🏆 已破關 '+cleared+' / '+TOTAL_LEVELS+' 關';
+}
+
 // init: cover screen with auto-playing demo
-L=genLevel(5); buildLevel(L); state='cover';
+L=genLevel(5); buildLevel(L); state='cover'; demoZapAt=0.35+Math.random()*0.45;
 overlay.classList.add('hidden');
-renderLevels(); setCircuit(false);
+renderLevels(); setCircuit(false); updateCoverStats();
 requestAnimationFrame(loop);
 })();
 </script>
